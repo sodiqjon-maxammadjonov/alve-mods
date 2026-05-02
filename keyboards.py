@@ -71,13 +71,24 @@ def subscribe_keyboard(lang: str, channels: list, app_id: int) -> InlineKeyboard
     label = channel_labels.get(lang, "Kanal")
     builder = InlineKeyboardBuilder()
     for i, ch in enumerate(channels):
-        # Support join request links (https://t.me/+xxx) stored as channel_id
-        ch_id = ch.get("channel_id", "")
-        if ch_id.startswith("https://"):
-            link = ch_id
+        ch_id    = ch.get("channel_id", "")
+        ch_name  = ch.get("channel_name", f"{label} {i+1}")
+        inv_link = ch.get("invite_link", "")
+
+        # Tashqi platforma (YouTube, Instagram va h.k.) — URL sifatida saqlangan
+        is_external = ch_id.startswith("http://") or ch_id.startswith("https://")
+
+        if is_external:
+            # URL tugma + click ni DB ga yozuvchi inline_url tugma
+            # Telegram inline_url va callback ni birgalikda qo'llab quvvatlamaydi,
+            # shuning uchun url tugma ishlatamiz — click = a'zo hisob (subscription.py da)
+            builder.button(text=ch_name, url=ch_id)
+        elif inv_link and inv_link.startswith("https://"):
+            builder.button(text=ch_name, url=inv_link)
         else:
-            link = ch.get("invite_link") or f"https://t.me/{ch_id.lstrip('@')}"
-        builder.button(text=f"📢 {label} {i+1}", url=link)
+            link = f"https://t.me/{ch_id.lstrip('@')}"
+            builder.button(text=ch_name, url=link)
+
     builder.button(
         text=t(lang, "check_subscription"),
         callback_data=f"check_sub:{app_id}"

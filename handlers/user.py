@@ -48,6 +48,22 @@ async def handle_join_request(update: ChatJoinRequest, bot: Bot):
         logger.warning(f"Failed to record join request: {e}")
 
 
+# ─── TASHQI KANAL CLICK HANDLER (YouTube, Instagram va h.k.) ──────────
+
+@router.callback_query(F.data.startswith("ext_clicked:"))
+async def external_channel_clicked(callback: CallbackQuery):
+    """
+    Foydalanuvchi tashqi platforma (YouTube va h.k.) tugmasini bossa,
+    DB ga yozamiz — keyingi tekshiruvda a'zo hisob bo'ladi.
+    """
+    try:
+        channel_url = callback.data.replace("ext_clicked:", "", 1)
+        await db.record_join_request(channel_url, callback.from_user.id)
+    except Exception as e:
+        logger.warning(f"external_channel_clicked error: {e}")
+    await callback.answer("✅ Ochilmoqda...")
+
+
 def is_admin(user_id: int) -> bool:
     return user_id in ADMIN_IDS
 
@@ -371,16 +387,27 @@ async def check_subscription(callback: CallbackQuery, bot: Bot):
 
     channels = await db.get_active_channels()
 
+    # Tashqi kanallar uchun: foydalanuvchi "Tekshirish" bosganida
+    # URL tugmani bosgandek qabul qilamiz — DB ga yozamiz
+    for ch in channels:
+        ch_id = ch.get("channel_id", "")
+        is_external = ch_id.startswith("http://") or ch_id.startswith("https://")
+        if is_external:
+            try:
+                await db.record_join_request(ch_id, callback.from_user.id)
+            except Exception:
+                pass
+
     all_sub, unsub = await check_user_subscriptions(bot, callback.from_user.id, channels)
 
     if not all_sub:
         await callback.answer(t(lang, "not_subscribed"), show_alert=True)
         return
 
-    # A'zolikni qayd etamiz
+    # A'zolikni qayd etamiz (Telegram kanallar uchun)
     for ch in channels:
         ch_id = ch.get("channel_id", "")
-        if ch_id and not ch_id.startswith("https://"):
+        if ch_id and not ch_id.startswith("http"):
             await db.record_channel_join(ch_id, callback.from_user.id)
 
     await callback.message.edit_text(t(lang, "subscribed_ok"))

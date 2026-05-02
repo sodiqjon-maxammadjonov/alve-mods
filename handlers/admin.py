@@ -1166,10 +1166,17 @@ async def add_channel_start(callback: CallbackQuery, state: FSMContext):
     if not is_admin(callback.from_user.id):
         return
     await callback.message.answer(
-        "📢 <b>Kanal username, ID yoki invite link kiriting:</b>\n\n"
-        "Misol: <code>@mening_kanalim</code>\n"
-        "Yoki: <code>-1001234567890</code>\n"
-        "Yoki join request link: <code>https://t.me/+xxxxxxxx</code>",
+        "📢 <b>Kanal qo'shish</b>\n\n"
+        "<b>Telegram kanal:</b>\n"
+        "• <code>@mening_kanalim</code>\n"
+        "• <code>-1001234567890</code>\n"
+        "• Join request link: <code>https://t.me/+xxxxxxxx</code>\n\n"
+        "<b>Boshqa platformalar (YouTube, Instagram va h.k.):</b>\n"
+        "• <code>https://youtube.com/@kanalim</code>\n"
+        "• <code>https://instagram.com/sahifam</code>\n"
+        "• Yoki ixtiyoriy havola\n\n"
+        "💡 Boshqa platformalar uchun bot a'zolikni tekshira olmaydi,\n"
+        "foydalanuvchilar tugmani bossalar a'zo hisob bo'ladi.",
         reply_markup=admin_cancel_keyboard(),
         parse_mode="HTML",
     )
@@ -1188,12 +1195,11 @@ async def channel_id_received(message: Message, state: FSMContext, bot: Bot):
 
     raw_input = message.text.strip()
 
-    # Join request link (https://t.me/+xxxx) — kanal ID ni alohida so'raymiz
     import re
-    is_join_link = bool(re.match(r"https?://t\.me/\+[A-Za-z0-9_-]+", raw_input))
 
+    # ── 1. Join request link (https://t.me/+xxxx) ──
+    is_join_link = bool(re.match(r"https?://t\.me/\+[A-Za-z0-9_-]+", raw_input))
     if is_join_link:
-        # Join link ni saqlab, kanal ID ni so'raymiz
         await state.update_data(join_invite_link=raw_input)
         await message.answer(
             "🔗 <b>Join request havola qabul qilindi!</b>\n\n"
@@ -1208,6 +1214,46 @@ async def channel_id_received(message: Message, state: FSMContext, bot: Bot):
         await state.set_state(AddChannelStates.waiting_join_numeric_id)
         return
 
+    # ── 2. Tashqi platforma (YouTube, Instagram va h.k.) ──
+    is_external = bool(re.match(r"https?://", raw_input)) and "t.me" not in raw_input
+    if is_external:
+        # Platforma nomini aniqlaymiz
+        if "youtube.com" in raw_input or "youtu.be" in raw_input:
+            platform_name = "YouTube"
+            platform_emoji = "▶️"
+        elif "instagram.com" in raw_input:
+            platform_name = "Instagram"
+            platform_emoji = "📷"
+        elif "tiktok.com" in raw_input:
+            platform_name = "TikTok"
+            platform_emoji = "🎵"
+        elif "twitter.com" in raw_input or "x.com" in raw_input:
+            platform_name = "Twitter/X"
+            platform_emoji = "🐦"
+        elif "facebook.com" in raw_input or "fb.com" in raw_input:
+            platform_name = "Facebook"
+            platform_emoji = "👤"
+        else:
+            platform_name = "Kanal"
+            platform_emoji = "🔗"
+
+        await state.update_data(
+            external_link=raw_input,
+            platform_name=platform_name,
+            platform_emoji=platform_emoji,
+        )
+        await message.answer(
+            f"{platform_emoji} <b>{platform_name} havola qabul qilindi!</b>\n\n"
+            f"<code>{raw_input}</code>\n\n"
+            f"Endi kanal <b>nomini</b> kiriting (foydalanuvchilarga ko'rsatiladi):\n"
+            f"Misol: <code>{platform_name} Kanalimiz</code>",
+            reply_markup=admin_cancel_keyboard(),
+            parse_mode="HTML",
+        )
+        await state.set_state(AddChannelStates.waiting_channel_name)
+        return
+
+    # ── 3. Oddiy Telegram kanal (@username yoki -100ID) ──
     wait_msg = await message.answer("🔍 Kanal tekshirilmoqda...")
 
     try:
@@ -1255,6 +1301,47 @@ async def channel_id_received(message: Message, state: FSMContext, bot: Bot):
         text += f"\n\n{info['invite_warning']}"
 
     await message.answer(text, reply_markup=admin_menu(), parse_mode="HTML")
+
+
+@router.message(AddChannelStates.waiting_channel_name)
+async def external_channel_name_received(message: Message, state: FSMContext):
+    """YouTube, Instagram va boshqa tashqi platformalar uchun nom qabul qilish"""
+    if not is_admin(message.from_user.id):
+        return
+    if message.text == CANCEL_TEXT:
+        await state.clear()
+        await message.answer("❌ Bekor qilindi.", reply_markup=admin_menu())
+        return
+
+    data          = await state.get_data()
+    external_link = data.get("external_link", "")
+    emoji         = data.get("platform_emoji", "🔗")
+    name          = message.text.strip()
+
+    # Tashqi kanallar uchun channel_id = URL ning o'zi
+    # Invite link = URL
+    # A'zolikni tekshirish bo'lmaydi — tugmani bosish = a'zo hisob
+    added = await db.add_channel(
+        channel_id=external_link,   # URL ni ID sifatida saqlaymiz
+        channel_name=f"{emoji} {name}",
+        invite_link=external_link,  # Tugmada ochiladi
+        added_by=message.from_user.id,
+    )
+    await state.clear()
+
+    if added:
+        await message.answer(
+            f"✅ <b>Kanal qo'shildi!</b>\n\n"
+            f"{emoji} <b>{name}</b>\n"
+            f"🔗 {external_link}\n\n"
+            f"⚠️ <b>Eslatma:</b> Bu tashqi platforma bo'lgani uchun\n"
+            f"bot a'zolikni avtomatik tekshira olmaydi.\n"
+            f"Foydalanuvchi tugmani 1 marta bossa, a'zo hisob bo'ladi.",
+            reply_markup=admin_menu(),
+            parse_mode="HTML",
+        )
+    else:
+        await message.answer("⚠️ Bu kanal allaqachon ro'yxatda.", reply_markup=admin_menu())
 
 
 @router.message(AddChannelStates.waiting_join_numeric_id)

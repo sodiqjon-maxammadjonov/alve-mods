@@ -57,16 +57,28 @@ async def check_user_subscriptions(bot: Bot, user_id: int, channels: list) -> tu
     """
     Foydalanuvchi barcha kanallarga a'zo yoki so'rov yuborganini tekshiradi.
 
-    Oddiy kanal  → get_chat_member orqali tekshirish
-    Join-request kanal (invite_link da t.me/+ bor) →
-        avval get_chat_member (tasdiqlangan bo'lishi mumkin),
-        keyin join_requests jadvalidan (so'rov yuborgan, hali tasdiqlanmagan)
+    Oddiy Telegram kanal  → get_chat_member orqali tekshirish
+    Join-request kanal    → get_chat_member + join_requests jadval
+    Tashqi kanal (YouTube, Instagram va h.k.) →
+        channel_id URL bilan boshlanadi → faqat DB dan tekshiriladi (1 marta click = a'zo)
     """
     unsubscribed = []
     for channel in channels:
         ch_id      = channel.get("channel_id", "")
         inv_link   = channel.get("invite_link", "")
         is_jr_chan = _is_join_request_link(inv_link)
+
+        # ── Tashqi platforma (YouTube, Instagram va h.k.) ──
+        is_external = ch_id.startswith("http://") or ch_id.startswith("https://")
+        if is_external:
+            # join_requests jadvalida borligi = tugmani bosgan = a'zo hisob
+            try:
+                clicked = await db.has_join_request(ch_id, user_id)
+            except Exception:
+                clicked = False
+            if not clicked:
+                unsubscribed.append(channel)
+            continue
 
         # Eski noto'g'ri saqlangan linklar
         if ch_id.startswith("https://") or ch_id.startswith("http://"):
