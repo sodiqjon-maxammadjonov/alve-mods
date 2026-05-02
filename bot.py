@@ -30,6 +30,25 @@ logger = logging.getLogger(__name__)
 DB_PATH = os.getenv("DB_PATH", "bot_data.db")
 
 
+# ─── SELF PING ─────────────────────────────────────────────────────────
+
+async def self_ping():
+    import aiohttp
+    render_url = os.getenv("RENDER_EXTERNAL_URL", "").rstrip("/")
+    if not render_url:
+        logger.warning("RENDER_EXTERNAL_URL not set, self-ping disabled")
+        return
+    await asyncio.sleep(60)
+    while True:
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(f"{render_url}/health", timeout=aiohttp.ClientTimeout(total=10)) as r:
+                    logger.info(f"Self-ping: {r.status}")
+        except Exception as e:
+            logger.warning(f"Self-ping error: {e}")
+        await asyncio.sleep(14 * 60)
+
+
 # ─── HEALTH CHECK (Render Web Service uchun) ───────────────────────────
 
 async def health_check(request):
@@ -130,6 +149,7 @@ async def main():
 
     # Backup schedulerni ishga tushiramiz
     asyncio.create_task(daily_backup_scheduler(bot))
+    asyncio.create_task(self_ping())
 
     logger.info("Starting polling...")
     try:
