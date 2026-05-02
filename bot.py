@@ -62,7 +62,7 @@ async def self_ping():
 
 async def health_check(request):
     return web.Response(text="OK", status=200)
-
+    print("ishladi database yaxshiiii")  
 
 async def start_web_server():
     app = web.Application()
