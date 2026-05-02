@@ -116,8 +116,12 @@ async def main():
         raise ValueError("BOT_TOKEN not set!")
 
     logger.info("Initializing database...")
-    await db.init_db()
-    logger.info("Database ready ✅")
+    try:
+        await db.init_db()
+        logger.info("Database ready ✅")
+    except Exception as e:
+        logger.error(f"Database error: {e}")
+        raise
 
     bot = Bot(
         token=BOT_TOKEN,
