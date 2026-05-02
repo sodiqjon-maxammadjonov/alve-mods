@@ -513,6 +513,7 @@ _MENU_TEXTS = {
     "👥 Foydalanuvchilar",
     "📊 Statistika",
     "📣 Xabar yuborish",
+    "🗄 Backup olish",
     "🏠 Asosiy menyu",
     "👨‍💼 Admin panel",
 }
