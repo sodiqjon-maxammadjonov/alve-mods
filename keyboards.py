@@ -49,6 +49,7 @@ def admin_menu() -> ReplyKeyboardMarkup:
     builder.button(text="👥 Foydalanuvchilar")
     builder.button(text="📊 Statistika")
     builder.button(text="📣 Xabar yuborish")
+    builder.button(text="🗄 Backup olish")
     builder.button(text="🏠 Asosiy menyu")
     builder.adjust(2)
     return builder.as_markup(resize_keyboard=True)

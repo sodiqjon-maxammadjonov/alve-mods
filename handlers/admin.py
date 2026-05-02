@@ -214,6 +214,17 @@ async def show_stats(message: Message):
     )
 
 
+@router.message(F.text == "🗄 Backup olish")
+async def manual_backup(message: Message, bot: Bot):
+    """Admin backup tugmasini bossa hozir backup yuboradi"""
+    if not is_admin(message.from_user.id):
+        return
+    from bot import send_backup
+    await message.answer("⏳ Backup tayyorlanmoqda...")
+    await send_backup(bot)
+    await message.answer("✅ Backup yuborildi!", reply_markup=admin_menu())
+
+
 @router.message(F.text == "🏠 Asosiy menyu")
 async def back_to_user_menu(message: Message, state: FSMContext):
     if not is_admin(message.from_user.id):
