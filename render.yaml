@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: alve-mods-bot
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python bot.py
+    plan: free
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: DB_LINK
+        sync: false
+      - key: ADMIN_IDS
+        sync: false
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: SECRET_GROUP_ID
+        sync: false
